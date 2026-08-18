@@ -1,0 +1,9 @@
+bin/
+obj/
+dist/
+.vs/
+*.user
+*.suo
+icon-tools/node_modules/
+installer/OneClickInstaller/Payload/
+release-output*/
