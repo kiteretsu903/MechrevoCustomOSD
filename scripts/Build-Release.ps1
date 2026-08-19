@@ -1,11 +1,11 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '1.0.1',
+    [string]$Version = '1.0.2',
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\release-output')
 )
 
 $ErrorActionPreference = 'Stop'
-if ($Version -ne '1.0.1') { throw 'This source tree is prepared for version 1.0.1.' }
+if ($Version -ne '1.0.2') { throw 'This source tree is prepared for version 1.0.2.' }
 
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $output = [IO.Path]::GetFullPath($OutputDirectory)

@@ -32,7 +32,7 @@ flowchart LR
 
 ## 窗口行为
 
-OSD 使用 `WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`，并通过 `SetWindowPos(HWND_TOPMOST, ... SWP_NOACTIVATE)` 显示。它不会抢走当前应用焦点，也不会接收鼠标输入，但能覆盖普通窗口。
+OSD 同时使用 `WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE` 与 `OverlappedPresenter.IsAlwaysOnTop`。WinUI 激活窗口后再设置 presenter，并在每次显示卡片前复核该状态，避免激活过程替换较早设置的原生 Z 顺序。它不会抢走当前应用焦点，也不会接收鼠标输入，但能覆盖普通窗口。
 
 Desktop Acrylic 使用 `DesktopAcrylicController` 的 Thin 模式。系统不支持或控制器注册失败时，窗口回退到固定颜色，不影响事件监听。
 

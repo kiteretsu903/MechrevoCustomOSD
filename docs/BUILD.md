@@ -12,9 +12,9 @@ The app targets `net8.0-windows10.0.19041.0` and x64. Windows App SDK components
 
 ```console
 dotnet restore .\winui3-osd\MechrevoCustomOSD.csproj -p:Platform=x64 --locked-mode
-dotnet publish .\winui3-osd\MechrevoCustomOSD.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained false --no-restore -o .\dist\MechrevoCustomOSD-v1.0.1\app
+dotnet publish .\winui3-osd\MechrevoCustomOSD.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained false --no-restore -o .\dist\MechrevoCustomOSD-v1.0.2\app
 ```
-The example output is `dist\MechrevoCustomOSD-v1.0.1`. The included build script also refuses to overwrite an existing output directory.
+The example output is `dist\MechrevoCustomOSD-v1.0.2`. The included build script also refuses to overwrite an existing output directory.
 
 ## Release assets
 
@@ -23,6 +23,6 @@ The included release-build script creates a self-contained portable ZIP, a self-
 ## Test without installing
 
 ```console
-.\dist\MechrevoCustomOSD-v1.0.1\app\MechrevoCustomOSD.exe --demo
-.\dist\MechrevoCustomOSD-v1.0.1\app\MechrevoCustomOSD.exe --stop
+.\dist\MechrevoCustomOSD-v1.0.2\app\MechrevoCustomOSD.exe --demo
+.\dist\MechrevoCustomOSD-v1.0.2\app\MechrevoCustomOSD.exe --stop
 ```

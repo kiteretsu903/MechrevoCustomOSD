@@ -1,6 +1,7 @@
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -40,6 +41,8 @@ public sealed partial class OSDWindow : Window
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly DispatcherQueueTimer _hideTimer;
     private readonly nint _hwnd;
+    private AppWindow? _appWindow;
+    private OverlappedPresenter? _presenter;
     private DesktopAcrylicController? _acrylicController;
     private SystemBackdropConfiguration? _backdropConfiguration;
     private TrayIcon? _trayIcon;
@@ -112,6 +115,7 @@ public sealed partial class OSDWindow : Window
         ConfigureNativeWindow();
         InitializeAcrylic();
         Activate();
+        ConfigureAppWindow();
         HideOverlay();
         _trayIcon = TrayIcon.TryCreate(
             _dispatcherQueue,
@@ -289,8 +293,32 @@ public sealed partial class OSDWindow : Window
         DwmSetWindowAttribute(_hwnd, DwmwaWindowCornerPreference, ref cornerPreference, sizeof(int));
     }
 
+    private void ConfigureAppWindow()
+    {
+        var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
+        _appWindow = AppWindow.GetFromWindowId(windowId);
+        _presenter = _appWindow.Presenter as OverlappedPresenter;
+        if (_presenter is null)
+        {
+            EventLogger.Write("OSD AppWindow presenter is not overlapped; native z-order fallback only.");
+            return;
+        }
+
+        _presenter.SetBorderAndTitleBar(false, false);
+        _presenter.IsResizable = false;
+        _presenter.IsMinimizable = false;
+        _presenter.IsMaximizable = false;
+        _presenter.IsAlwaysOnTop = true;
+        EventLogger.Write("OSD AppWindow always-on-top presenter active.");
+    }
+
     private void PositionAndShow()
     {
+        if (_presenter is not null && !_presenter.IsAlwaysOnTop)
+        {
+            _presenter.IsAlwaysOnTop = true;
+        }
+
         GetCursorPos(out Point cursor);
         nint monitor = MonitorFromPoint(cursor, MonitorDefaultToNearest);
         MonitorInfo monitorInfo = new() { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
