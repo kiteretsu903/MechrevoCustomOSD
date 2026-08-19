@@ -25,4 +25,6 @@ flowchart LR
 | `TrayIcon.cs` | `Shell_NotifyIcon`, fixed menu commands, executable icon extraction |
 | `app.manifest` | `asInvoker`, `uiAccess=false`, PerMonitorV2 DPI awareness |
 
+The tray callback window and native menu run on a dedicated STA/message-pump thread. Menu selections are marshalled to the WinUI dispatcher, so a modal tray menu cannot delay firmware-event cards. Duplicate tray callbacks are ignored while a menu is already open.
+
 The OSD uses `WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE` and `SetWindowPos(HWND_TOPMOST, ... SWP_NOACTIVATE)`. It therefore stays above ordinary windows without taking keyboard focus or mouse input.

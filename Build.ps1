@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist\MechrevoCustomOSD-v1.0.0')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist\MechrevoCustomOSD-v1.0.1')
 )
 
 $ErrorActionPreference = 'Stop'

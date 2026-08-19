@@ -20,15 +20,16 @@ This project replaces only the display layer: it listens to the laptop firmware'
 - Fluent Emoji 3D artwork inside OSD cards
 - A crisp monochrome Fluent Gauge tray icon with native 16–256 px frames
 - Automatic Chinese/English UI selection, plus a manual tray-menu override
+- A dedicated tray thread so an open tray menu cannot block firmware-event cards
 - Performance mode, keyboard backlight, touchpad, Fn Lock, Windows-key lock, airplane mode, ambient-light sensor, and refresh-rate notifications
 - Standard-user runtime; the OSD does not request elevation or UIAccess
 - No runtime network access
 
 Brightness and Caps/Num/Scroll Lock notifications are intentionally omitted because Windows 11 already provides them.
 
-## Install v1.0.0
+## Install v1.0.1
 
-Download `MechrevoCustomOSD-v1.0.0-OneClickInstaller.exe` from the [v1.0.0 release](../../releases/tag/v1.0.0), verify its SHA256 value, and run it. The installer requests administrator permission once to save and disable the OEM `BLDHotKeyService`, preventing the official and custom OSDs from conflicting without deleting OEM files. The installed OSD itself starts at sign-in with `RunLevel Limited`.
+Download `MechrevoCustomOSD-v1.0.1-OneClickInstaller.exe` from the [v1.0.1 release](../../releases/tag/v1.0.1), verify its SHA256 value, and run it. The installer requests administrator permission once to save and disable the OEM `BLDHotKeyService`, preventing the official and custom OSDs from conflicting without deleting OEM files. The installed OSD itself starts at sign-in with `RunLevel Limited`.
 
 The release executable is currently unsigned, so Microsoft Defender SmartScreen may show an **Unknown publisher** warning. Do not disable SmartScreen globally; verify the release checksum before running it.
 

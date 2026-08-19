@@ -7,8 +7,8 @@ namespace MechrevoCustomOSD.Installer;
 
 internal static class Program
 {
-    private const string ProductName = "Mechrevo Custom OSD v1.0.0";
-    private const string TemporaryPrefix = "MechrevoCustomOSD-v1.0.0-";
+    private const string ProductName = "Mechrevo Custom OSD v1.0.1";
+    private const string TemporaryPrefix = "MechrevoCustomOSD-v1.0.1-";
 
     [STAThread]
     private static int Main(string[] args)

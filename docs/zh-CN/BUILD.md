@@ -14,7 +14,7 @@
 
 ```console
 dotnet restore .\winui3-osd\MechrevoCustomOSD.csproj -p:Platform=x64 --locked-mode
-dotnet publish .\winui3-osd\MechrevoCustomOSD.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained false --no-restore -o .\dist\MechrevoCustomOSD-v1.0.0\app
+dotnet publish .\winui3-osd\MechrevoCustomOSD.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained false --no-restore -o .\dist\MechrevoCustomOSD-v1.0.1\app
 ```
 
 先以 `--locked-mode` 校验 `packages.lock.json`，然后执行 Release/x64 发布。仓库中的构建脚本会在目标目录已经存在时停止，以避免误覆盖。
@@ -29,8 +29,8 @@ dotnet publish .\winui3-osd\MechrevoCustomOSD.csproj -c Release -p:Platform=x64 
 ## 验证
 
 ```console
-.\dist\MechrevoCustomOSD-v1.0.0\app\MechrevoCustomOSD.exe --demo
-.\dist\MechrevoCustomOSD-v1.0.0\app\MechrevoCustomOSD.exe --stop
+.\dist\MechrevoCustomOSD-v1.0.1\app\MechrevoCustomOSD.exe --demo
+.\dist\MechrevoCustomOSD-v1.0.1\app\MechrevoCustomOSD.exe --stop
 ```
 
 `--demo` 会复用已经运行的单实例并请求显示测试卡片；`--stop` 通过当前用户会话中的命名事件请求正常退出。

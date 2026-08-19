@@ -28,6 +28,8 @@ flowchart LR
 | `TrayIcon.cs` | `Shell_NotifyIcon`、固定托盘命令和 EXE 图标提取 |
 | `app.manifest` | `asInvoker`、`uiAccess=false`、PerMonitorV2 DPI |
 
+托盘回调窗口和原生菜单运行在独立 STA/消息循环线程；菜单选择再投递到 WinUI 调度队列，因此模态托盘菜单不会延迟固件事件卡片。菜单已经打开时会忽略重复托盘回调。
+
 ## 窗口行为
 
 OSD 使用 `WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`，并通过 `SetWindowPos(HWND_TOPMOST, ... SWP_NOACTIVATE)` 显示。它不会抢走当前应用焦点，也不会接收鼠标输入，但能覆盖普通窗口。

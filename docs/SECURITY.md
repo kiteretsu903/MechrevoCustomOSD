@@ -19,4 +19,4 @@ The elevated setup path limits changes to the fixed `BLDHotKeyService`, `%Progra
 
 ## Distribution
 
-The v1.0.0 binaries are unsigned. Publish SHA256 hashes with every release and do not advise users to disable SmartScreen or antivirus protection globally. A future code-signing certificate would materially improve publisher verification.
+Release binaries are unsigned. Publish SHA256 hashes with every release and do not advise users to disable SmartScreen or antivirus protection globally. A future code-signing certificate would materially improve publisher verification.

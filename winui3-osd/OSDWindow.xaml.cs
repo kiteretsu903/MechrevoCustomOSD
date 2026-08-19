@@ -114,7 +114,6 @@ public sealed partial class OSDWindow : Window
         Activate();
         HideOverlay();
         _trayIcon = TrayIcon.TryCreate(
-            _hwnd,
             _dispatcherQueue,
             ShowDemo,
             () => ExitRequested?.Invoke());

@@ -1,11 +1,11 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '1.0.0',
+    [string]$Version = '1.0.1',
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\release-output')
 )
 
 $ErrorActionPreference = 'Stop'
-if ($Version -ne '1.0.0') { throw 'This source tree is prepared for version 1.0.0.' }
+if ($Version -ne '1.0.1') { throw 'This source tree is prepared for version 1.0.1.' }
 
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $output = [IO.Path]::GetFullPath($OutputDirectory)
@@ -57,7 +57,7 @@ $builtInstaller = Join-Path $installerOutput 'MechrevoCustomOSD.Installer.exe'
 $releaseInstaller = Join-Path $output "MechrevoCustomOSD-v$Version-OneClickInstaller.exe"
 Copy-Item -LiteralPath $builtInstaller -Destination $releaseInstaller
 
-$releaseNotes = Join-Path $repository 'RELEASE_NOTES_v1.0.0.md'
+$releaseNotes = Join-Path $repository "RELEASE_NOTES_v$Version.md"
 Copy-Item -LiteralPath $releaseNotes -Destination $output
 
 $checksumLines = Get-ChildItem -LiteralPath $output -File | Sort-Object Name | ForEach-Object {

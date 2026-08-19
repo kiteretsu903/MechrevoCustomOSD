@@ -20,15 +20,16 @@
 - OSD 卡片使用 Fluent Emoji 3D 图标
 - 透明背景、纯白 Fluent Gauge 托盘图标，包含 16–256 px 原生尺寸
 - 根据 Windows UI 语言自动切换中文/英文，也可在托盘菜单手动选择
+- 托盘菜单使用独立线程，保持打开时不会阻塞固件事件卡片
 - 性能模式、键盘背光、触控板、Fn Lock、Windows 键锁定、飞行模式、环境光感应和刷新率提示
 - 常驻程序使用普通用户权限，不请求管理员权限或 UIAccess
 - 运行时不访问网络
 
 亮度以及 Caps/Num/Scroll Lock 提示有意不实现，继续使用 Windows 11 自带提示。
 
-## 安装 v1.0.0
+## 安装 v1.0.1
 
-从 [v1.0.0 Release](../../releases/tag/v1.0.0) 下载 `MechrevoCustomOSD-v1.0.0-OneClickInstaller.exe`，核对 SHA256 后运行。安装器会请求一次管理员权限，保存并停用官方 `BLDHotKeyService`，避免官方与自定义 OSD 同时运行造成冲突，但不删除任何官方文件；安装后的 OSD 登录任务明确使用 `RunLevel Limited`。
+从 [v1.0.1 Release](../../releases/tag/v1.0.1) 下载 `MechrevoCustomOSD-v1.0.1-OneClickInstaller.exe`，核对 SHA256 后运行。安装器会请求一次管理员权限，保存并停用官方 `BLDHotKeyService`，避免官方与自定义 OSD 同时运行造成冲突，但不删除任何官方文件；安装后的 OSD 登录任务明确使用 `RunLevel Limited`。
 
 当前安装器没有代码签名，因此 Microsoft Defender SmartScreen 可能显示“未知发布者”。不要全局关闭 SmartScreen，请先核对 Release 校验值。
 

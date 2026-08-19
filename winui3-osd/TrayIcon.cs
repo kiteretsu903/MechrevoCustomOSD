@@ -1,18 +1,21 @@
 using Microsoft.UI.Dispatching;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace MechrevoCustomOSD;
 
 internal sealed class TrayIcon : IDisposable
 {
-    private const int GwlWndProc = -4;
-    private const uint TrayCallbackMessage = 0x8000 + 42;
-    private const uint WmContextMenu = 0x007B;
     private const uint WmNull = 0x0000;
+    private const uint WmContextMenu = 0x007B;
     private const uint WmRButtonUp = 0x0205;
     private const uint NinSelect = 0x0400;
     private const uint NinKeySelect = 0x0401;
+    private const uint WmApp = 0x8000;
+    private const uint TrayCallbackMessage = WmApp + 42;
+    private const uint RefreshTooltipMessage = WmApp + 43;
+    private const uint ShutdownMessage = WmApp + 44;
     private const uint NimAdd = 0x00000000;
     private const uint NimModify = 0x00000001;
     private const uint NimDelete = 0x00000002;
@@ -39,16 +42,22 @@ internal sealed class TrayIcon : IDisposable
     private const uint CommandPreview = 1004;
     private const uint CommandExit = 1005;
 
-    private readonly nint _window;
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly Action _showPreview;
     private readonly Action _exit;
     private readonly WindowProcedure _windowProcedure;
-    private readonly uint _taskbarCreatedMessage;
-    private nint _oldWindowProcedure;
+    private readonly Thread _thread;
+    private readonly ManualResetEventSlim _ready = new(false);
+    private readonly string _windowClassName;
+    private Exception? _startupException;
+    private nint _module;
+    private nint _trayWindow;
     private nint _icon;
+    private uint _taskbarCreatedMessage;
+    private bool _classRegistered;
     private bool _ownsIcon;
     private bool _added;
+    private bool _menuOpen;
     private bool _disposed;
     private NotifyIconData _data;
 
@@ -57,6 +66,35 @@ internal sealed class TrayIcon : IDisposable
     {
         internal int X;
         internal int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Message
+    {
+        internal nint Window;
+        internal uint Id;
+        internal nuint WParam;
+        internal nint LParam;
+        internal uint Time;
+        internal Point Cursor;
+        internal uint Private;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct WindowClass
+    {
+        internal uint Size;
+        internal uint Style;
+        internal nint WindowProcedure;
+        internal int ClassExtra;
+        internal int WindowExtra;
+        internal nint Instance;
+        internal nint Icon;
+        internal nint Cursor;
+        internal nint Background;
+        internal string? MenuName;
+        internal string ClassName;
+        internal nint SmallIcon;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -91,11 +129,50 @@ internal sealed class TrayIcon : IDisposable
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate nint WindowProcedure(nint window, uint message, nint wParam, nint lParam);
 
-    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
-    private static extern nint SetWindowLongPtr(nint window, int index, nint newValue);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint GetModuleHandleW(string? moduleName);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern ushort RegisterClassExW(ref WindowClass windowClass);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern nint CallWindowProc(nint previous, nint window, uint message, nint wParam, nint lParam);
+    private static extern bool UnregisterClassW(string className, nint instance);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern nint CreateWindowExW(
+        uint extendedStyle,
+        string className,
+        string windowName,
+        uint style,
+        int x,
+        int y,
+        int width,
+        int height,
+        nint parent,
+        nint menu,
+        nint instance,
+        nint parameter);
+
+    [DllImport("user32.dll")]
+    private static extern bool DestroyWindow(nint window);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint DefWindowProcW(nint window, uint message, nint wParam, nint lParam);
+
+    [DllImport("user32.dll")]
+    private static extern int GetMessageW(out Message message, nint window, uint minimum, uint maximum);
+
+    [DllImport("user32.dll")]
+    private static extern bool TranslateMessage(ref Message message);
+
+    [DllImport("user32.dll")]
+    private static extern nint DispatchMessageW(ref Message message);
+
+    [DllImport("user32.dll")]
+    private static extern void PostQuitMessage(int exitCode);
+
+    [DllImport("user32.dll")]
+    private static extern bool EndMenu();
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern bool Shell_NotifyIconW(uint message, ref NotifyIconData data);
@@ -133,51 +210,171 @@ internal sealed class TrayIcon : IDisposable
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern uint RegisterWindowMessageW(string message);
 
-    private TrayIcon(nint window, DispatcherQueue dispatcherQueue, Action showPreview, Action exit)
+    private TrayIcon(DispatcherQueue dispatcherQueue, Action showPreview, Action exit)
     {
-        _window = window;
         _dispatcherQueue = dispatcherQueue;
         _showPreview = showPreview;
         _exit = exit;
         _windowProcedure = HandleWindowMessage;
-        _taskbarCreatedMessage = RegisterWindowMessageW("TaskbarCreated");
+        _windowClassName = "MechrevoCustomOSD.Tray." + Environment.ProcessId;
+        _thread = new Thread(TrayThreadMain)
+        {
+            IsBackground = true,
+            Name = "MechrevoCustomOSD.Tray"
+        };
+        _thread.SetApartmentState(ApartmentState.STA);
+        _thread.Start();
 
-        nint procedurePointer = Marshal.GetFunctionPointerForDelegate(_windowProcedure);
-        Marshal.SetLastPInvokeError(0);
-        _oldWindowProcedure = SetWindowLongPtr(_window, GwlWndProc, procedurePointer);
-        int error = Marshal.GetLastWin32Error();
-        if (_oldWindowProcedure == 0 && error != 0)
+        if (!_ready.Wait(TimeSpan.FromSeconds(5)))
         {
-            throw new Win32Exception(error, "Unable to install tray window callback.");
+            _disposed = true;
+            throw new TimeoutException("Timed out while starting the tray icon thread.");
         }
-
-        try
+        if (_startupException is not null)
         {
-            LoadApplicationIcon();
-            AddIcon();
-        }
-        catch
-        {
-            ReleaseNativeResources();
-            throw;
+            _disposed = true;
+            throw new InvalidOperationException("Unable to initialize the tray icon thread.", _startupException);
         }
     }
 
     internal static TrayIcon? TryCreate(
-        nint window,
         DispatcherQueue dispatcherQueue,
         Action showPreview,
         Action exit)
     {
         try
         {
-            return new TrayIcon(window, dispatcherQueue, showPreview, exit);
+            return new TrayIcon(dispatcherQueue, showPreview, exit);
         }
         catch (Exception exception)
         {
             EventLogger.Write("Tray icon initialization failed: " + exception);
             return null;
         }
+    }
+
+    private void TrayThreadMain()
+    {
+        try
+        {
+            _module = GetModuleHandleW(null);
+            _taskbarCreatedMessage = RegisterWindowMessageW("TaskbarCreated");
+
+            WindowClass windowClass = new()
+            {
+                Size = (uint)Marshal.SizeOf<WindowClass>(),
+                WindowProcedure = Marshal.GetFunctionPointerForDelegate(_windowProcedure),
+                Instance = _module,
+                ClassName = _windowClassName
+            };
+            if (RegisterClassExW(ref windowClass) == 0)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to register the tray callback window.");
+            }
+            _classRegistered = true;
+
+            _trayWindow = CreateWindowExW(
+                0,
+                _windowClassName,
+                string.Empty,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                _module,
+                0);
+            if (_trayWindow == 0)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to create the tray callback window.");
+            }
+
+            LoadApplicationIcon();
+            AddIcon();
+            _ready.Set();
+
+            while (GetMessageW(out Message message, 0, 0, 0) > 0)
+            {
+                TranslateMessage(ref message);
+                DispatchMessageW(ref message);
+            }
+        }
+        catch (Exception exception)
+        {
+            _startupException = exception;
+            EventLogger.Write("Tray icon thread failed: " + exception);
+            _ready.Set();
+        }
+        finally
+        {
+            ReleaseNativeResources();
+            if (_trayWindow != 0)
+            {
+                DestroyWindow(_trayWindow);
+                _trayWindow = 0;
+            }
+            if (_classRegistered)
+            {
+                UnregisterClassW(_windowClassName, _module);
+                _classRegistered = false;
+            }
+            _ready.Set();
+        }
+    }
+
+    private nint HandleWindowMessage(nint window, uint message, nint wParam, nint lParam)
+    {
+        try
+        {
+            if (message == ShutdownMessage)
+            {
+                EndMenu();
+                PostQuitMessage(0);
+                return 0;
+            }
+
+            if (message == RefreshTooltipMessage)
+            {
+                RefreshTooltip();
+                return 0;
+            }
+
+            if (message == _taskbarCreatedMessage)
+            {
+                _added = false;
+                try { AddIcon(); } catch (Exception exception) { EventLogger.Write("Tray icon restore failed: " + exception.Message); }
+                return 0;
+            }
+
+            if (message == TrayCallbackMessage)
+            {
+                uint notification = unchecked((uint)lParam.ToInt64()) & 0xFFFF;
+                if (!_menuOpen && notification is WmContextMenu or WmRButtonUp or NinSelect or NinKeySelect)
+                {
+                    _menuOpen = true;
+                    try
+                    {
+                        EventLogger.Write("Tray menu opened on dedicated thread.");
+                        uint command = ShowMenu();
+                        HandleCommand(command);
+                    }
+                    finally
+                    {
+                        _menuOpen = false;
+                        EventLogger.Write("Tray menu closed.");
+                    }
+                }
+                return 0;
+            }
+        }
+        catch (Exception exception)
+        {
+            EventLogger.Write("Tray callback failure: " + exception);
+        }
+
+        return DefWindowProcW(window, message, wParam, lParam);
     }
 
     private void LoadApplicationIcon()
@@ -202,7 +399,7 @@ internal sealed class TrayIcon : IDisposable
         _data = new NotifyIconData
         {
             Size = (uint)Marshal.SizeOf<NotifyIconData>(),
-            Window = _window,
+            Window = _trayWindow,
             Id = 1,
             Flags = NifMessage | NifIcon | NifTip | NifShowTip,
             CallbackMessage = TrayCallbackMessage,
@@ -220,33 +417,9 @@ internal sealed class TrayIcon : IDisposable
         EventLogger.Write("Tray icon added.");
     }
 
-    private nint HandleWindowMessage(nint window, uint message, nint wParam, nint lParam)
+    private uint ShowMenu()
     {
-        if (message == _taskbarCreatedMessage)
-        {
-            _added = false;
-            try { AddIcon(); } catch (Exception exception) { EventLogger.Write("Tray icon restore failed: " + exception.Message); }
-            return 0;
-        }
-
-        if (message == TrayCallbackMessage)
-        {
-            uint notification = unchecked((uint)lParam.ToInt64()) & 0xFFFF;
-            if (notification is WmContextMenu or WmRButtonUp or NinSelect or NinKeySelect)
-            {
-                _dispatcherQueue.TryEnqueue(ShowMenu);
-                return 0;
-            }
-        }
-
-        return _oldWindowProcedure == 0
-            ? 0
-            : CallWindowProc(_oldWindowProcedure, window, message, wParam, lParam);
-    }
-
-    private void ShowMenu()
-    {
-        if (_disposed) return;
+        if (_disposed) return 0;
 
         LocalizedStrings text = Localization.Text;
         nint menu = CreatePopupMenu();
@@ -255,7 +428,7 @@ internal sealed class TrayIcon : IDisposable
         {
             if (menu != 0) DestroyMenu(menu);
             if (languageMenu != 0) DestroyMenu(languageMenu);
-            return;
+            return 0;
         }
 
         try
@@ -271,16 +444,16 @@ internal sealed class TrayIcon : IDisposable
             AppendMenuW(menu, MfString, CommandExit, text.TrayExit);
 
             GetCursorPos(out Point point);
-            SetForegroundWindow(_window);
+            SetForegroundWindow(_trayWindow);
             uint command = TrackPopupMenuEx(
                 menu,
                 TpmRightButton | TpmNoNotify | TpmReturnCmd,
                 point.X,
                 point.Y,
-                _window,
+                _trayWindow,
                 0);
-            PostMessageW(_window, WmNull, 0, 0);
-            HandleCommand(command);
+            PostMessageW(_trayWindow, WmNull, 0, 0);
+            return command;
         }
         finally
         {
@@ -309,22 +482,32 @@ internal sealed class TrayIcon : IDisposable
                 ChangeLanguage(LanguageMode.English);
                 break;
             case CommandPreview:
-                _showPreview();
+                _dispatcherQueue.TryEnqueue(() => _showPreview());
                 break;
             case CommandExit:
-                _exit();
+                _dispatcherQueue.TryEnqueue(() => _exit());
                 break;
         }
     }
 
     private void ChangeLanguage(LanguageMode mode)
     {
-        Localization.SetMode(mode);
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            Localization.SetMode(mode);
+            nint trayWindow = _trayWindow;
+            if (trayWindow != 0) PostMessageW(trayWindow, RefreshTooltipMessage, 0, 0);
+            _showPreview();
+        });
+    }
+
+    private void RefreshTooltip()
+    {
+        if (!_added) return;
         _data.Tip = Localization.Text.TrayTooltip;
         _data.Flags = NifTip;
         Shell_NotifyIconW(NimModify, ref _data);
-        EventLogger.Write("Language mode changed to " + mode + ".");
-        _showPreview();
+        EventLogger.Write("Tray tooltip updated.");
     }
 
     public void Dispose()
@@ -332,23 +515,26 @@ internal sealed class TrayIcon : IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        ReleaseNativeResources();
+        nint trayWindow = _trayWindow;
+        if (trayWindow != 0) PostMessageW(trayWindow, ShutdownMessage, 0, 0);
+        bool stopped = Thread.CurrentThread == _thread || _thread.Join(TimeSpan.FromSeconds(3));
+        if (!stopped)
+        {
+            EventLogger.Write("Tray icon thread did not stop within the timeout.");
+        }
+        else
+        {
+            _ready.Dispose();
+        }
         EventLogger.Write("Tray icon removed.");
     }
 
     private void ReleaseNativeResources()
     {
-
         if (_added)
         {
             Shell_NotifyIconW(NimDelete, ref _data);
             _added = false;
-        }
-
-        if (_oldWindowProcedure != 0)
-        {
-            SetWindowLongPtr(_window, GwlWndProc, _oldWindowProcedure);
-            _oldWindowProcedure = 0;
         }
 
         if (_ownsIcon && _icon != 0) DestroyIcon(_icon);
